@@ -126,17 +126,21 @@ class Neo4JStorage(BaseGraphStorage):
             )
             """The default value approach for the DATABASE is only intended to maintain compatibility with legacy practices."""
 
-            self._driver: AsyncDriver = AsyncGraphDatabase.driver(
-                URI,
-                auth=(USERNAME, PASSWORD),
-                max_connection_pool_size=MAX_CONNECTION_POOL_SIZE,
-                connection_timeout=CONNECTION_TIMEOUT,
-                connection_acquisition_timeout=CONNECTION_ACQUISITION_TIMEOUT,
-                max_transaction_retry_time=MAX_TRANSACTION_RETRY_TIME,
-                max_connection_lifetime=MAX_CONNECTION_LIFETIME,
-                liveness_check_timeout=LIVENESS_CHECK_TIMEOUT,
-                keep_alive=KEEP_ALIVE,
-            )
+            logger.info(f"[{self.workspace}] Neo4j URI: {URI}")
+            if self._driver is None:
+                self._driver: AsyncDriver = AsyncGraphDatabase.driver(
+                    URI,
+                    auth=(USERNAME, PASSWORD),
+                    max_connection_pool_size=MAX_CONNECTION_POOL_SIZE,
+                    connection_timeout=CONNECTION_TIMEOUT,
+                    connection_acquisition_timeout=CONNECTION_ACQUISITION_TIMEOUT,
+                    max_transaction_retry_time=MAX_TRANSACTION_RETRY_TIME,
+                    max_connection_lifetime=MAX_CONNECTION_LIFETIME,
+                    liveness_check_timeout=LIVENESS_CHECK_TIMEOUT,
+                    keep_alive=KEEP_ALIVE,
+                )
+                logger.info(f"[{self.workspace}] Neo4j driver created")
+
 
             # Try to connect to the database and create it if it doesn't exist
             for database in (DATABASE, None):
