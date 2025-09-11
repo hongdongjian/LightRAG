@@ -82,7 +82,7 @@ async def check_lightrag_setup(rag_instance: LightRAG, verbose: bool = False) ->
     try:
         from lightrag.kg.shared_storage import get_namespace_data
 
-        get_namespace_data("pipeline_status")
+        get_namespace_data(rag_instance.pipline_status)
         print("✅ Pipeline status: INITIALIZED")
     except KeyError:
         issues.append(
@@ -146,7 +146,7 @@ async def demo():
     print("\n" + "=" * 50)
     print("\n🔄 Initializing...\n")
     await rag.initialize_storages()
-    await initialize_pipeline_status()
+    await initialize_pipeline_status(rag.pipline_status)
 
     print("\n🟢 AFTER initialization:\n")
     await check_lightrag_setup(rag, verbose=True)

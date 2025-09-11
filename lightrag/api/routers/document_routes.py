@@ -1584,7 +1584,7 @@ async def background_delete_documents(
         get_pipeline_status_lock,
     )
 
-    pipeline_status = await get_namespace_data("pipeline_status")
+    pipeline_status = await get_namespace_data(rag.pipline_status)
     pipeline_status_lock = get_pipeline_status_lock()
 
     total_docs = len(doc_ids)
@@ -2078,7 +2078,7 @@ def create_document_routes(
         )
 
         # Get pipeline status and lock
-        pipeline_status = await get_namespace_data("pipeline_status")
+        pipeline_status = await get_namespace_data(rag.pipline_status)
         pipeline_status_lock = get_pipeline_status_lock()
 
         # Check and set status with lock
@@ -2273,7 +2273,7 @@ def create_document_routes(
                 get_all_update_flags_status,
             )
 
-            pipeline_status = await get_namespace_data("pipeline_status")
+            pipeline_status = await get_namespace_data(rag.pipline_status)
 
             # Get update flags status for all namespaces
             update_status = await get_all_update_flags_status()
@@ -2480,7 +2480,7 @@ def create_document_routes(
         try:
             from lightrag.kg.shared_storage import get_namespace_data
 
-            pipeline_status = await get_namespace_data("pipeline_status")
+            pipeline_status = await get_namespace_data(rag.pipline_status)
 
             # Check if pipeline is busy
             if pipeline_status.get("busy", False):
