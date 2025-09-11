@@ -1054,12 +1054,12 @@ def initialize_share_data(workers: int = 1):
     _initialized = True
 
 
-async def initialize_pipeline_status():
+async def initialize_pipeline_status(namespace="pipeline_status"):
     """
     Initialize pipeline namespace with default values.
     This function is called during FASTAPI lifespan for each worker.
     """
-    pipeline_namespace = await get_namespace_data("pipeline_status", first_init=True)
+    pipeline_namespace = await get_namespace_data(namespace, first_init=True)
 
     async with get_internal_lock():
         # Check if already initialized by checking for required fields
@@ -1214,7 +1214,7 @@ async def get_namespace_data(
     async with get_internal_lock():
         if namespace not in _shared_dicts:
             # Special handling for pipeline_status namespace
-            if namespace == "pipeline_status" and not first_init:
+            if "pipeline_status" in namespace and not first_init:
                 # Check if pipeline_status should have been initialized but wasn't
                 # This helps users understand they need to call initialize_pipeline_status()
                 raise PipelineNotInitializedError(namespace)

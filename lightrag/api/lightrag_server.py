@@ -155,12 +155,12 @@ def create_app(args):
         try:
             # Initialize database connections
             await rag.initialize_storages()
-            await initialize_pipeline_status()
+            await initialize_pipeline_status(rag.pipline_status)
 
             # Data migration regardless of storage implementation
             await rag.check_and_migrate_data()
 
-            pipeline_status = await get_namespace_data("pipeline_status")
+            pipeline_status = await get_namespace_data(rag.pipline_status)
 
             should_start_autoscan = False
             async with get_pipeline_status_lock():
@@ -634,7 +634,7 @@ def create_app(args):
     async def get_status():
         """Get current system status"""
         try:
-            pipeline_status = await get_namespace_data("pipeline_status")
+            pipeline_status = await get_namespace_data(rag.pipline_status)
 
             if not auth_configured:
                 auth_mode = "disabled"

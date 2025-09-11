@@ -141,6 +141,8 @@ class LightRAG:
     workspace: str = field(default_factory=lambda: os.getenv("WORKSPACE", ""))
     """Workspace for data isolation. Defaults to empty string if WORKSPACE environment variable is not set."""
 
+    pipline_status: str = field(default_factory=lambda: os.getenv("PIPLINE_STATUS", "pipeline_status"))
+
     # Logging (Deprecated, use setup_logger in utils.py instead)
     # ---
     log_level: int | None = field(default=None)
@@ -926,7 +928,7 @@ class LightRAG:
 
         await self.apipeline_enqueue_documents(input, ids, file_paths, track_id)
         await self.apipeline_process_enqueue_documents(
-            split_by_character, split_by_character_only
+            split_by_character, split_by_character_only, ids=ids
         )
 
         return track_id
@@ -1352,6 +1354,7 @@ class LightRAG:
         self,
         split_by_character: str | None = None,
         split_by_character_only: bool = False,
+        ids: str | list[str] | None = None
     ) -> None:
         """
         Process pending documents by splitting them into chunks, processing
@@ -1366,23 +1369,28 @@ class LightRAG:
         """
 
         # Get pipeline status shared data and lock
-        pipeline_status = await get_namespace_data("pipeline_status")
+        pipeline_status = await get_namespace_data(self.pipline_status)
         pipeline_status_lock = get_pipeline_status_lock()
 
         # Check if another process is already processing the queue
         async with pipeline_status_lock:
             # Ensure only one worker is processing documents
             if not pipeline_status.get("busy", False):
-                processing_docs, failed_docs, pending_docs = await asyncio.gather(
-                    self.doc_status.get_docs_by_status(DocStatus.PROCESSING),
-                    self.doc_status.get_docs_by_status(DocStatus.FAILED),
-                    self.doc_status.get_docs_by_status(DocStatus.PENDING),
-                )
-
                 to_process_docs: dict[str, DocProcessingStatus] = {}
-                to_process_docs.update(processing_docs)
-                to_process_docs.update(failed_docs)
-                to_process_docs.update(pending_docs)
+                if ids is None:
+                    processing_docs, failed_docs, pending_docs = await asyncio.gather(
+                        self.doc_status.get_docs_by_status(DocStatus.PROCESSING),
+                        self.doc_status.get_docs_by_status(DocStatus.FAILED),
+                        self.doc_status.get_docs_by_status(DocStatus.PENDING),
+                    )
+                    to_process_docs.update(processing_docs)
+                    to_process_docs.update(failed_docs)
+                    to_process_docs.update(pending_docs)
+                else:
+                    if isinstance(ids, str):
+                        ids = [ids]
+                    specified_docs = await self.aget_docs_by_ids(ids)
+                    to_process_docs.update(specified_docs)
 
                 if not to_process_docs:
                     logger.info("No documents to process")
@@ -1771,6 +1779,8 @@ class LightRAG:
                 pipeline_status["latest_message"] = log_message
                 pipeline_status["history_messages"].append(log_message)
 
+                if ids:
+                    break
                 # Check for pending documents again
                 processing_docs, failed_docs, pending_docs = await asyncio.gather(
                     self.doc_status.get_docs_by_status(DocStatus.PROCESSING),
@@ -2184,7 +2194,7 @@ class LightRAG:
         tasks = [self.doc_status.get_by_id(doc_id) for doc_id in id_list]
         # Execute tasks concurrently and gather the results. Results maintain order.
         # Type hint indicates results can be DocProcessingStatus or None if not found.
-        results_list: list[Optional[DocProcessingStatus]] = await asyncio.gather(*tasks)
+        results_list: list[Optional[dict]] = await asyncio.gather(*tasks)
 
         # Build the result dictionary, mapping found IDs to their statuses
         found_statuses: dict[str, DocProcessingStatus] = {}
@@ -2198,7 +2208,19 @@ class LightRAG:
             ]  # Get the original ID corresponding to this result index
             if status_obj:
                 # If a status object was returned (not None), add it to the result dict
-                found_statuses[doc_id] = status_obj
+                found_statuses[doc_id] = DocProcessingStatus(
+                    content_summary=status_obj.get("content_summary", ""),
+                    content_length=status_obj.get("content_length", 0),
+                    file_path=status_obj.get("file_path", ""),
+                    status=DocStatus(status_obj.get("status", "")),
+                    created_at=status_obj.get("created_at", ""),
+                    updated_at=status_obj.get("updated_at", ""),
+                    track_id=status_obj.get("track_id", ""),
+                    chunks_count=status_obj.get("chunks_count", 0),
+                    chunks_list=status_obj.get("chunks_list", []),
+                    error_msg=status_obj.get("error_msg", ""),
+                    metadata=status_obj.get("metadata", {}),
+                )
             else:
                 # If status_obj is None, the document ID was not found in storage
                 not_found_ids.append(doc_id)
@@ -2234,7 +2256,7 @@ class LightRAG:
         original_exception = None
 
         # Get pipeline status shared data and lock for status updates
-        pipeline_status = await get_namespace_data("pipeline_status")
+        pipeline_status = await get_namespace_data(self.pipline_status)
         pipeline_status_lock = get_pipeline_status_lock()
 
         async with pipeline_status_lock:
