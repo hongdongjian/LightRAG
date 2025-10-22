@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import json
@@ -5,6 +6,7 @@ from lightrag import LightRAG, QueryParam
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc, always_get_an_event_loop
 import numpy as np
+from lightrag.kg.shared_storage import initialize_pipeline_status
 
 
 ## For Upstage API
@@ -13,12 +15,12 @@ async def llm_model_func(
     prompt, system_prompt=None, history_messages=[], **kwargs
 ) -> str:
     return await openai_complete_if_cache(
-        "solar-mini",
+        "DeepSeek-V3-0324",
         prompt,
         system_prompt=system_prompt,
         history_messages=history_messages,
-        api_key=os.getenv("UPSTAGE_API_KEY"),
-        base_url="https://api.upstage.ai/v1/solar",
+        api_key="pk-d1d70e00-fe39-4ba9-b6fd-00ae44ae4d49",
+        base_url="https://modelservice.jdcloud.com/v1/",
         **kwargs,
     )
 
@@ -26,9 +28,9 @@ async def llm_model_func(
 async def embedding_func(texts: list[str]) -> np.ndarray:
     return await openai_embed(
         texts,
-        model="solar-embedding-1-large-query",
-        api_key=os.getenv("UPSTAGE_API_KEY"),
-        base_url="https://api.upstage.ai/v1/solar",
+        model="BAAI/bge-m3",
+        api_key="xxx",
+        base_url="http://114.67.83.77:8000/v1",
     )
 
 
@@ -82,22 +84,29 @@ def run_queries_and_save_to_json(
 
         result_file.write("\n]")
 
+async def initialize_rag():
+    rag = LightRAG(
+        working_dir=WORKING_DIR,
+        llm_model_func=llm_model_func,
+        embedding_func=EmbeddingFunc(embedding_dim=1024, func=embedding_func),
+    )
+
+    await rag.initialize_storages()
+    await initialize_pipeline_status()
+
+    return rag
 
 if __name__ == "__main__":
     cls = "mix"
     mode = "hybrid"
     WORKING_DIR = f"../{cls}"
 
-    rag = LightRAG(working_dir=WORKING_DIR)
-    rag = LightRAG(
-        working_dir=WORKING_DIR,
-        llm_model_func=llm_model_func,
-        embedding_func=EmbeddingFunc(embedding_dim=4096, func=embedding_func),
-    )
+    rag = asyncio.run(initialize_rag())
+
     query_param = QueryParam(mode=mode)
 
     base_dir = "../datasets/questions"
-    queries = extract_queries(f"{base_dir}/{cls}_questions.txt")
+    queries = extract_queries(f"{base_dir}/{cls}_questions2.txt")
     run_queries_and_save_to_json(
         queries, rag, query_param, f"{base_dir}/result.json", f"{base_dir}/errors.json"
     )

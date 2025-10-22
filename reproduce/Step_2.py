@@ -6,7 +6,10 @@ from transformers import GPT2Tokenizer
 def openai_complete_if_cache(
     model="gpt-4o", prompt=None, system_prompt=None, history_messages=[], **kwargs
 ) -> str:
-    openai_client = OpenAI()
+    openai_client = OpenAI(api_key="pk-d1d70e00-fe39-4ba9-b6fd-00ae44ae4d49", base_url="https://modelservice.jdcloud.com/v1/")
+    openai_client = OpenAI(api_key="sk-66a449938b434d09964fd1bc82e9ccf4",
+                           base_url="https://dashscope.aliyuncs.com/compatible-mode/v1/")
+    model = "qwen-plus"
 
     messages = []
     if system_prompt:
@@ -36,7 +39,7 @@ def get_summary(context, tot_tokens=2000):
     return summary
 
 
-clses = ["agriculture"]
+clses = ["mix"]
 for cls in clses:
     with open(f"../datasets/unique_contexts/{cls}_unique_contexts.json", mode="r") as f:
         unique_contexts = json.load(f)
@@ -69,9 +72,9 @@ for cls in clses:
         ...
     """
 
-    result = openai_complete_if_cache(model="gpt-4o", prompt=prompt)
+    result = openai_complete_if_cache(model="DeepSeek-V3-0324", prompt=prompt)
 
-    file_path = f"../datasets/questions/{cls}_questions.txt"
+    file_path = f"../datasets/questions/{cls}_questions2.txt"
     with open(file_path, "w") as file:
         file.write(result)
 

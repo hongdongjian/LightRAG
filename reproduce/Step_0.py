@@ -46,6 +46,8 @@ def extract_unique_contexts(input_directory, output_directory):
         print(
             f"There are {len(unique_contexts_list)} unique `context` entries in the file {filename}."
         )
+        if len(unique_contexts_list) != 0:
+            unique_contexts_list = unique_contexts_list[:1]
 
         try:
             with open(output_path, "w", encoding="utf-8") as outfile:
@@ -59,7 +61,7 @@ def extract_unique_contexts(input_directory, output_directory):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input_dir", type=str, default="../datasets")
+    parser.add_argument("-i", "--input_dir", type=str, default="/Users/hongdongjian/Documents/workspace/python/UltraDomain")
     parser.add_argument(
         "-o", "--output_dir", type=str, default="../datasets/unique_contexts"
     )

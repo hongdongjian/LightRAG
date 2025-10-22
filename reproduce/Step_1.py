@@ -6,6 +6,10 @@ import asyncio
 from lightrag import LightRAG
 from lightrag.kg.shared_storage import initialize_pipeline_status
 
+from lightrag.utils import setup_logger
+
+setup_logger("lightrag", level="DEBUG")
+
 
 def insert_text(rag, file_path):
     with open(file_path, mode="r") as f:
