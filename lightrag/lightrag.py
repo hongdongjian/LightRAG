@@ -1579,51 +1579,58 @@ class LightRAG:
         pipeline_status = await get_namespace_data(self.pipline_status)
         pipeline_status_lock = get_pipeline_status_lock()
 
-        # Check if another process is already processing the queue
-        async with pipeline_status_lock:
-            # Ensure only one worker is processing documents
-            if not pipeline_status.get("busy", False):
-                to_process_docs: dict[str, DocProcessingStatus] = {}
-                if ids is None:
+        if ids is None:
+            # Check if another process is already processing the queue
+            async with pipeline_status_lock:
+                # Ensure only one worker is processing documents
+                if not pipeline_status.get("busy", False):
                     processing_docs, failed_docs, pending_docs = await asyncio.gather(
                         self.doc_status.get_docs_by_status(DocStatus.PROCESSING),
                         self.doc_status.get_docs_by_status(DocStatus.FAILED),
                         self.doc_status.get_docs_by_status(DocStatus.PENDING),
                     )
+
+                    to_process_docs: dict[str, DocProcessingStatus] = {}
                     to_process_docs.update(processing_docs)
                     to_process_docs.update(failed_docs)
                     to_process_docs.update(pending_docs)
+
+                    if not to_process_docs:
+                        logger.info("No documents to process")
+                        return
+
+                    pipeline_status.update(
+                        {
+                            "busy": True,
+                            "job_name": "Default Job",
+                            "job_start": datetime.now(timezone.utc).isoformat(),
+                            "docs": 0,
+                            "batchs": 0,  # Total number of files to be processed
+                            "cur_batch": 0,  # Number of files already processed
+                            "request_pending": False,  # Clear any previous request
+                            "cancellation_requested": False,  # Initialize cancellation flag
+                            "latest_message": "",
+                        }
+                    )
+                    # Cleaning history_messages without breaking it as a shared list object
+                    del pipeline_status["history_messages"][:]
                 else:
-                    if isinstance(ids, str):
-                        ids = [ids]
-                    specified_docs = await self.aget_docs_by_ids(ids)
-                    to_process_docs.update(specified_docs)
-
-                if not to_process_docs:
-                    logger.info("No documents to process")
+                    # Another process is busy, just set request flag and return
+                    pipeline_status["request_pending"] = True
+                    logger.info(
+                        "Another process is already processing the document queue. Request queued."
+                    )
                     return
-
-                pipeline_status.update(
-                    {
-                        "busy": True,
-                        "job_name": "Default Job",
-                        "job_start": datetime.now(timezone.utc).isoformat(),
-                        "docs": 0,
-                        "batchs": 0,  # Total number of files to be processed
-                        "cur_batch": 0,  # Number of files already processed
-                        "request_pending": False,  # Clear any previous request
-                        "cancellation_requested": False,  # Initialize cancellation flag
-                        "latest_message": "",
-                    }
-                )
-                # Cleaning history_messages without breaking it as a shared list object
-                del pipeline_status["history_messages"][:]
-            else:
-                # Another process is busy, just set request flag and return
-                pipeline_status["request_pending"] = True
-                logger.info(
-                    "Another process is already processing the document queue. Request queued."
-                )
+        else:
+            # 从外部保证文档不被并发处理，这块就不需要加锁了
+            # pipeline_status 里的数据会错乱，后续再优化
+            if isinstance(ids, str):
+                ids = [ids]
+            specified_docs = await self.aget_docs_by_ids(ids)
+            to_process_docs: dict[str, DocProcessingStatus] = {}
+            to_process_docs.update(specified_docs)
+            if not to_process_docs:
+                logger.info("No documents to process")
                 return
 
         try:
