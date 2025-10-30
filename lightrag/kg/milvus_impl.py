@@ -1064,9 +1064,16 @@ class MilvusVectorDBStorage(BaseVectorStorage):
         embeddings = np.concatenate(embeddings_list)
         for i, d in enumerate(list_data):
             d["vector"] = embeddings[i]
-        results = self._client.upsert(
-            collection_name=self.final_namespace, data=list_data
-        )
+
+        # Insert data in batches based on _max_batch_size
+        results = []
+        for i in range(0, len(list_data), self._max_batch_size):
+            batch_data = list_data[i : i + self._max_batch_size]
+            result = self._client.upsert(
+                collection_name=self.final_namespace, data=batch_data
+            )
+            results.append(result)
+
         return results
 
     async def query(
